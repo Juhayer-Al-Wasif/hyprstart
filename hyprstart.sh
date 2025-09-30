@@ -1,17 +1,23 @@
 #!/bin/bash
 
-# hyprland-autostart-manager.sh
-# Terminal app for managing Hyprland autostart setup
+# hyprstart.sh - Hyprland Autostart Manager
+# Hyprland Purple theme with typewriter ASCII art header
 
 set -e
 
-# Colors
-RED='\033[0;31m'
+# Hyprland Purple Colors
+PURPLE='\033[0;35m'
+PURPLE_DARK='\033[38;5;99m'
+PURPLE_MEDIUM='\033[38;5;105m'
+PURPLE_LIGHT='\033[38;5;141m'
+PURPLE_BRIGHT='\033[38;5;147m'
+PURPLE_PALE='\033[38;5;183m'
+PINK='\033[38;5;213m'
+CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
+RED='\033[0;31m'
+WHITE='\033[1;37m'
 NC='\033[0m' # No Color
 
 # Configuration
@@ -20,32 +26,76 @@ HYPRLAND_SETUP_SCRIPT="$SCRIPT_DIR/hyprland-autostart-setup.sh"
 HYPRLAND_VERIFY_SCRIPT="$SCRIPT_DIR/hyprland-verify-setup.sh"
 SERVICE_FILE="$HOME/.config/systemd/user/hyprland.service"
 
-# Print colored output
-print_header() {
-    echo -e "${PURPLE}==========================================${NC}"
-    echo -e "${PURPLE}    Hyprland Autostart Manager${NC}"
-    echo -e "${PURPLE}==========================================${NC}"
+# Animation functions
+spinner() {
+    local pid=$1
+    local delay=0.1
+    local spinstr='|/-\'
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        local temp=${spinstr#?}
+        printf " ${PURPLE_LIGHT}[%c]${NC}  " "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b\b"
+    done
+    printf "    \b\b\b\b"
+}
+
+# Hyprland purple theme ASCII art
+typewriter_ascii() {
+    local ascii_lines=(
+        "██╗  ██╗██╗   ██╗██████╗ ██████╗ ███████╗████████╗ █████╗ ██████╗ ████████╗"
+        "██║  ██║╚██╗ ██╔╝██╔══██╗██╔══██╗██╔════╝╚══██╔══╝██╔══██╗██╔══██╗╚══██╔══╝"
+        "███████║ ╚████╔╝ ██████╔╝██████╔╝███████╗   ██║   ███████║██████╔╝   ██║   "
+        "██╔══██║  ╚██╔╝  ██╔═══╝ ██╔══██╗╚════██║   ██║   ██╔══██║██╔══██╗   ██║   "
+        "██║  ██║   ██║   ██║     ██║  ██║███████║   ██║   ██║  ██║██║  ██║   ██║   "
+        "╚═╝  ╚═╝   ╚═╝   ╚═╝     ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   "
+    )
+    
+    local purples=("$PURPLE_DARK" "$PURPLE" "$PURPLE_MEDIUM" "$PURPLE_LIGHT" "$PURPLE_BRIGHT" "$PURPLE_PALE")
+    
+    clear
+    for line_idx in "${!ascii_lines[@]}"; do
+        line="${ascii_lines[$line_idx]}"
+        color="${purples[$line_idx % ${#purples[@]}]}"
+        for ((i=0; i<${#line}; i++)); do
+            printf "${color}%s${NC}" "${line:$i:1}"
+            sleep 0.001
+        done
+        printf "\n"
+    done
+    echo ""
+    echo -e "${PURPLE}====================================================================${NC}"
+    echo -e "${PINK}                     Simple Autostart Manager${NC}"
+    echo -e "${PURPLE}====================================================================${NC}"
     echo ""
 }
 
-print_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+# Print header
+print_header() {
+    typewriter_ascii
 }
 
-print_success() {
+print_section() {
+    echo ""
+    echo -e "${PURPLE_LIGHT}=== $1 ===${NC}"
+    echo ""
+}
+
+print_info() { 
+    echo -e "${PURPLE_LIGHT}[INFO]${NC} $1"
+}
+print_success() { 
     echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
-
-print_warning() {
+print_warning() { 
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
-
-print_error() {
+print_error() { 
     echo -e "${RED}[ERROR]${NC} $1"
 }
-
-print_action() {
-    echo -e "${CYAN}[ACTION]${NC} $1"
+print_action() { 
+    echo -e "${PURPLE_MEDIUM}[ACTION]${NC} $1"
 }
 
 # Check if running on Arch Linux
@@ -54,31 +104,49 @@ check_arch_linux() {
         print_error "This script is designed for Arch Linux only."
         exit 1
     fi
-    print_success "Running on Arch Linux"
 }
 
-# Install the necessary scripts
+# Check if Hyprland is installed (silent version)
+check_hyprland_installed() {
+    if ! command -v Hyprland &> /dev/null && ! command -v hyprland &> /dev/null; then
+        print_error "Hyprland is not installed!"
+        echo ""
+        echo -e "${YELLOW}Installation options:${NC}"
+        echo -e "  ${GREEN}›${NC} ${PURPLE_LIGHT}sudo pacman -S hyprland${NC}"
+        echo -e "  ${GREEN}›${NC} ${PURPLE_LIGHT}yay -S hyprland-git${NC}"
+        echo ""
+        print_info "After installing Hyprland, run this script again."
+        exit 1
+    fi
+}
+
+# Install scripts automatically
 install_scripts() {
-    print_action "Installing Hyprland autostart scripts..."
+    if [ -f "$HYPRLAND_SETUP_SCRIPT" ] && [ -f "$HYPRLAND_VERIFY_SCRIPT" ]; then
+        return 0
+    fi
     
-    # Create script directory if it doesn't exist
+    print_action "Installing necessary scripts..."
     mkdir -p "$SCRIPT_DIR"
     
-    # Create the setup script
-    cat > "$HYPRLAND_SETUP_SCRIPT" << 'EOF'
+    # Show spinner while creating scripts
+    (
+        # Create setup script with Hyprland purple colors
+        cat > "$HYPRLAND_SETUP_SCRIPT" << 'EOF'
 #!/bin/bash
-# hyprland-autostart-setup.sh
-# Setup script for Hyprland systemd autostart
+# Hyprland autostart setup script
 
 set -e
 
-# Colors
+# Hyprland Purple Colors
+PURPLE='\033[0;35m'
+PURPLE_LIGHT='\033[38;5;141m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-print_status() { echo -e "${BLUE}[INFO]${NC} $1"; }
+print_status() { echo -e "${PURPLE}[INFO]${NC} $1"; }
 print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 
@@ -138,16 +206,17 @@ enable_service() {
 }
 
 main() {
-    echo "=========================================="
-    echo "  Hyprland Autostart Setup"
-    echo "=========================================="
+    echo -e "${PURPLE}==========================================${NC}"
+    echo -e "${PURPLE}        Hyprland Autostart Setup${NC}"
+    echo -e "${PURPLE}==========================================${NC}"
+    echo ""
     
     HYPRLAND_EXEC=$(check_hyprland)
     setup_service "$HYPRLAND_EXEC"
     enable_service
     
     echo ""
-    echo "=========================================="
+    echo -e "${PURPLE}==========================================${NC}"
     print_success "Setup completed successfully!"
     echo ""
     echo "Hyprland will start automatically on login."
@@ -156,44 +225,35 @@ main() {
 main "$@"
 EOF
 
-    # Create the verify script
-    cat > "$HYPRLAND_VERIFY_SCRIPT" << 'EOF'
+        # Create verify script with Hyprland purple colors
+        cat > "$HYPRLAND_VERIFY_SCRIPT" << 'EOF'
 #!/bin/bash
-# hyprland-verify-setup.sh
-# Verification script for Hyprland autostart setup
+# Hyprland setup verification script
 
 set -e
 
-# Colors
+# Hyprland Purple Colors
+PURPLE='\033[0;35m'
+PURPLE_LIGHT='\033[38;5;141m'
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-print_success() { echo -e "${GREEN}✅${NC} $1"; }
-print_error() { echo -e "${RED}❌${NC} $1"; }
-print_warning() { echo -e "${YELLOW}⚠️${NC} $1"; }
-print_info() { echo -e "${BLUE}ℹ️${NC} $1"; }
+print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 
 SERVICE_FILE="$HOME/.config/systemd/user/hyprland.service"
 
-echo "=========================================="
-echo "    Hyprland Autostart Verification"
-echo "=========================================="
+echo -e "${PURPLE}==========================================${NC}"
+echo -e "${PURPLE}    Hyprland Autostart Verification${NC}"
+echo -e "${PURPLE}==========================================${NC}"
 echo ""
-
-# Check if Hyprland is installed
-if command -v Hyprland &> /dev/null || command -v hyprland &> /dev/null; then
-    HYPRLAND_EXEC=$(command -v Hyprland || command -v hyprland)
-    print_success "Hyprland installed: $HYPRLAND_EXEC"
-else
-    print_error "Hyprland not found in PATH"
-fi
 
 # Check service file
-echo ""
-echo "Service File Check:"
+echo -e "${PURPLE_LIGHT}Service File Check:${NC}"
 if [ -f "$SERVICE_FILE" ]; then
     print_success "Service file exists: $SERVICE_FILE"
     
@@ -205,7 +265,7 @@ if [ -f "$SERVICE_FILE" ]; then
             print_success "Service file points to correct Hyprland executable"
         else
             print_warning "Service file points to: $CURRENT_EXEC"
-            print_info "Expected: $EXPECTED_EXEC"
+            echo -e "${PURPLE_LIGHT}Expected: $EXPECTED_EXEC${NC}"
         fi
     fi
 else
@@ -214,7 +274,7 @@ fi
 
 # Check service status
 echo ""
-echo "Service Status:"
+echo -e "${PURPLE_LIGHT}Service Status:${NC}"
 if systemctl --user is-enabled hyprland.service 2>/dev/null; then
     print_success "Service is enabled"
 else
@@ -229,80 +289,22 @@ fi
 
 # Overall status
 echo ""
-echo "=========================================="
+echo -e "${PURPLE}==========================================${NC}"
 if [ -f "$SERVICE_FILE" ] && systemctl --user is-enabled hyprland.service 2>/dev/null; then
     print_success "Hyprland autostart is properly configured!"
     echo "Hyprland will start automatically on login."
+    exit 0
 else
     print_error "Hyprland autostart is not properly configured."
     echo "Run the setup script to configure autostart."
+    exit 1
 fi
-echo "=========================================="
 EOF
 
-    # Make scripts executable
-    chmod +x "$HYPRLAND_SETUP_SCRIPT"
-    chmod +x "$HYPRLAND_VERIFY_SCRIPT"
-    
-    print_success "Scripts installed to: $SCRIPT_DIR"
-}
-
-# Verify current setup
-verify_setup() {
-    print_action "Verifying current Hyprland autostart setup..."
-    
-    # Run the verify script if it exists, otherwise do basic checks
-    if [ -f "$HYPRLAND_VERIFY_SCRIPT" ]; then
-        "$HYPRLAND_VERIFY_SCRIPT"
-    else
-        print_warning "Verify script not found. Performing basic checks..."
-        
-        # Basic checks
-        if command -v Hyprland &> /dev/null || command -v hyprland &> /dev/null; then
-            print_success "Hyprland is installed"
-        else
-            print_error "Hyprland is not installed"
-        fi
-        
-        if [ -f "$SERVICE_FILE" ]; then
-            print_success "Service file exists"
-        else
-            print_error "Service file not found"
-        fi
-        
-        if systemctl --user is-enabled hyprland.service 2>/dev/null; then
-            print_success "Service is enabled"
-        else
-            print_error "Service is not enabled"
-        fi
-    fi
-}
-
-# Run setup
-run_setup() {
-    print_action "Running Hyprland autostart setup..."
-    
-    if [ -f "$HYPRLAND_SETUP_SCRIPT" ]; then
-        "$HYPRLAND_SETUP_SCRIPT"
-    else
-        print_error "Setup script not found. Please install scripts first."
-        exit 1
-    fi
-}
-
-# Show menu
-show_menu() {
-    echo ""
-    print_header
-    echo "Please choose an option:"
-    echo ""
-    echo -e "${GREEN}1${NC}) Verify current setup"
-    echo -e "${GREEN}2${NC}) Install/Update scripts only"
-    echo -e "${GREEN}3${NC}) Verify and setup if needed (auto)"
-    echo -e "${GREEN}4${NC}) Run setup only"
-    echo -e "${GREEN}5${NC}) Check Hyprland installation"
-    echo -e "${GREEN}6${NC}) Exit"
-    echo ""
+        chmod +x "$HYPRLAND_SETUP_SCRIPT" "$HYPRLAND_VERIFY_SCRIPT"
+    ) &
+    spinner $!
+    print_success "Scripts installed to: ${PURPLE_LIGHT}$SCRIPT_DIR${NC}"
 }
 
 # Check if setup is needed
@@ -314,105 +316,161 @@ is_setup_needed() {
     fi
 }
 
-# Check Hyprland installation
-check_hyprland_install() {
-    print_action "Checking Hyprland installation..."
-    
-    if command -v Hyprland &> /dev/null || command -v hyprland &> /dev/null; then
-        HYPRLAND_EXEC=$(command -v Hyprland || command -v hyprland)
-        print_success "Hyprland is installed: $HYPRLAND_EXEC"
-        
-        # Check version if possible
-        if $HYPRLAND_EXEC --version &>/dev/null; then
-            VERSION=$($HYPRLAND_EXEC --version 2>/dev/null | head -n1 || echo "Unknown version")
-            print_info "Version: $VERSION"
-        fi
+# Check if setup exists
+is_setup_exists() {
+    if [ -f "$SERVICE_FILE" ] || systemctl --user is-enabled hyprland.service 2>/dev/null; then
+        return 0  # Setup exists
     else
-        print_error "Hyprland is not installed"
-        echo ""
-        print_info "To install Hyprland, run:"
-        echo "  sudo pacman -S hyprland"
-        echo ""
-        print_info "Or for the git version:"
-        echo "  yay -S hyprland-git"
+        return 1  # Setup doesn't exist
     fi
+}
+
+# Main setup function - verifies and sets up if needed
+main_setup() {
+    print_section "Hyprland Autostart Setup"
+    
+    # Auto-install scripts if missing
+    install_scripts
+    
+    # Run verification first
+    print_action "Verifying current setup..."
+    if [ -f "$HYPRLAND_VERIFY_SCRIPT" ]; then
+        "$HYPRLAND_VERIFY_SCRIPT"
+        VERIFY_EXIT_CODE=$?
+    else
+        print_warning "Verify script not found, using basic verification..."
+        VERIFY_EXIT_CODE=1
+    fi
+    
+    echo ""
+    
+    # If verification passed (everything is already set up)
+    if [ $VERIFY_EXIT_CODE -eq 0 ]; then
+        print_success "Hyprland autostart is already properly configured!"
+        echo ""
+        read -p "$(echo -e "${PURPLE_LIGHT}Exit script? ${GREEN}(Y/n)${NC}: ")" choice
+        if [[ $choice =~ ^[Nn]$ ]]; then
+            print_info "Returning to menu..."
+            return
+        else
+            print_success "Have a good day! 🚀"
+            exit 0
+        fi
+    fi
+    
+    # If verification failed (setup is needed)
+    print_warning "Hyprland autostart is not properly configured."
+    read -p "$(echo -e "${YELLOW}Would you like to set it up now? ${GREEN}(Y/n)${NC}: ")" choice
+    if [[ $choice =~ ^[Nn]$ ]]; then
+        print_info "Setup cancelled."
+        return
+    fi
+    
+    print_action "Configuring Hyprland autostart..."
+    if [ -f "$HYPRLAND_SETUP_SCRIPT" ]; then
+        "$HYPRLAND_SETUP_SCRIPT"
+    else
+        print_error "Setup script not found!"
+        return 1
+    fi
+}
+
+# Undo setup function
+undo_setup() {
+    print_section "Undo Hyprland Autostart Setup"
+    
+    if ! is_setup_exists; then
+        print_warning "No Hyprland autostart setup found to undo."
+        return
+    fi
+    
+    print_action "Checking current setup..."
+    echo ""
+    
+    if systemctl --user is-active hyprland.service 2>/dev/null; then
+        print_action "Stopping Hyprland service..."
+        systemctl --user stop hyprland.service 2>/dev/null && print_success "Service stopped" || print_warning "Could not stop service"
+    fi
+    
+    if systemctl --user is-enabled hyprland.service 2>/dev/null; then
+        print_action "Disabling Hyprland service..."
+        systemctl --user disable hyprland.service 2>/dev/null && print_success "Service disabled" || print_warning "Could not disable service"
+    fi
+    
+    print_action "Reloading systemd..."
+    systemctl --user daemon-reload 2>/dev/null && print_success "Systemd reloaded" || print_warning "Could not reload systemd"
+    
+    if [ -f "$SERVICE_FILE" ]; then
+        print_action "Removing service file..."
+        rm "$SERVICE_FILE" && print_success "Service file removed: ${PURPLE_LIGHT}$SERVICE_FILE${NC}" || print_error "Could not remove service file"
+    fi
+    
+    echo ""
+    print_success "Hyprland autostart setup has been completely removed!"
+    echo ""
+    print_info "Note: Hyprland will no longer start automatically on login."
+}
+
+# Show menu
+show_menu() {
+    echo ""
+    echo -e "${WHITE}Please choose an option:${NC}"
+    echo ""
+    echo -e "  ${GREEN}1${NC}) ${PURPLE_LIGHT}Setup Hyprland Autostart${NC} - ${WHITE}Verifies and configures automatically${NC}"
+    echo -e "  ${GREEN}2${NC}) ${YELLOW}Undo Setup${NC} - ${WHITE}Remove autostart configuration${NC}"
+    echo -e "  ${GREEN}3${NC}) ${PINK}Exit${NC} - ${WHITE}Close the application${NC}"
+    echo ""
 }
 
 # Main application logic
 main() {
+    print_header
     check_arch_linux
+    check_hyprland_installed
+    
+    # Auto-install scripts on first run
+    install_scripts
     
     # If no arguments, show interactive menu
     if [ $# -eq 0 ]; then
         while true; do
             show_menu
-            read -p "Enter your choice (1-6): " choice
+            read -p "$(echo -e "${PURPLE}Enter your choice ${GREEN}(1-3) [1]${NC}: ")" choice
+            choice=${choice:-1}  # Default to 1 if empty
             
             case $choice in
                 1)
-                    verify_setup
+                    main_setup
+                    echo ""
                     ;;
                 2)
-                    install_scripts
+                    undo_setup
+                    echo ""
                     ;;
                 3)
-                    install_scripts
-                    verify_setup
-                    if is_setup_needed; then
-                        echo ""
-                        read -p "Setup is needed. Run setup now? (y/N): " run_setup_choice
-                        if [[ $run_setup_choice =~ ^[Yy]$ ]]; then
-                            run_setup
-                        fi
-                    else
-                        print_success "Setup is already complete!"
-                    fi
-                    ;;
-                4)
-                    run_setup
-                    ;;
-                5)
-                    check_hyprland_install
-                    ;;
-                6)
-                    print_info "Have a good day!"
+                    echo ""
+                    print_success "Thank you for using ${PURPLE_LIGHT}HyprStart${NC}! 🌟"
+                    print_success "Have a good day! 🚀"
                     exit 0
                     ;;
                 *)
-                    print_error "Invalid choice. Please enter 1-6."
+                    print_error "Invalid choice. Please enter 1-3."
+                    echo ""
                     ;;
             esac
-            
-            echo ""
-            read -p "Press Enter to continue..."
         done
     else
         # Handle command line arguments
         case $1 in
-            "verify")
-                verify_setup
+            "setup"|"auto")
+                main_setup
                 ;;
-            "install-scripts")
-                install_scripts
-                ;;
-            "setup")
-                run_setup
-                ;;
-            "auto")
-                install_scripts
-                if is_setup_needed; then
-                    print_action "Auto-detected setup needed. Running setup..."
-                    run_setup
-                else
-                    print_success "Setup is already complete!"
-                fi
-                ;;
-            "check-hyprland")
-                check_hyprland_install
+            "undo"|"remove")
+                undo_setup
                 ;;
             *)
                 print_error "Unknown command: $1"
-                echo "Available commands: verify, install-scripts, setup, auto, check-hyprland"
+                echo -e "${WHITE}Available commands: ${PURPLE_LIGHT}setup${NC}, ${YELLOW}undo${NC}"
                 exit 1
                 ;;
         esac
