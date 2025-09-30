@@ -10,7 +10,10 @@ A minimal shell script to set up Hyprland as a systemd user service.
 - Automatic verification of existing setup
 
 ## Usage
-### Installation
 ```bash
+# Installation
 chmod +x setup_hyprland.sh
 ./setup_hyprland.sh
+
+# Removal
+./setup_hyprland.sh --undo
