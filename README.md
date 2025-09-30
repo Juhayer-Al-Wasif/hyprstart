@@ -2,7 +2,7 @@
 
 A comprehensive terminal application for managing Hyprland autostart on Arch Linux. HyprStart simplifies the process of setting up and verifying Hyprland's automatic startup using systemd user services.
 
-<img width="925" height="513" alt="image" src="https://github.com/user-attachments/assets/96c90bc0-49b9-4bd6-aadc-ca09d01c1b12" />
+<img width="940" height="513" alt="image" src="https://github.com/user-attachments/assets/edb52e8e-3d81-4f31-ab62-5a2af64ece75" />
 
 ## Features
 
