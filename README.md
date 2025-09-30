@@ -1,6 +1,5 @@
-# Hyprland Systemd Service Setup
 
-A minimal shell script to set up Hyprland as a systemd user service.
+A minimal shell script to start up Hyprland as a systemd user service.
 
 ## Features
 
